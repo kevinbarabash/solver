@@ -31,8 +31,12 @@ class Expression {
 
     freeVariables() {
         return this.terms.filter(t => {
-            return t.variable && !t.variable.fixed;
+            return t.variable && !t.variable.value
         }).map(t => t.variable);
+    }
+
+    variables() {
+        return new Set(this.terms.filter(t => t.variable).map(t => t.variable));
     }
 
     collectLikeTerms() {

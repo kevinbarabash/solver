@@ -5,9 +5,13 @@ class Constraint {
     constructor(left, comp, right) {
         if (left instanceof Variable) {
             left = new Expression(1, left);
+        } else if (Number.isFinite(left)) {
+            left = new Expression(left);
         }
         if (right instanceof Variable) {
             right = new Expression(1, right);
+        } else if (Number.isFinite(right)) {
+            right = new Expression(right);
         }
 
         this.expr = new Expression();
@@ -72,6 +76,10 @@ class Constraint {
         });
 
         freeVariable.value = result / -remainingTerm.coeff;
+    }
+
+    variables() {
+        return this.expr.variables();
     }
 
     toString() {

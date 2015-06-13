@@ -4,7 +4,6 @@ class Variable {
     constructor(value = 0) {
         Object.assign(this, { value });
         this.id = id++;
-        this.fixed = false;
     }
 
     toString() {

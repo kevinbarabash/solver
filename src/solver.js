@@ -1,73 +1,61 @@
-let Variable = require('./variable');
-let Expression = require('./expression');
-let Constraint = require('./constraint');
+/**
+ * Contains a set of constraints and has facilities for solving
+ * sets of constraints, including:
+ *
+ * - determine which constraints form trees (and a forest)
+ * - determine which constraints need to be solved if a
+ *   particular variable is updated (which tree is it in)
+ * - solve constraints that are solvable and update values
+ *   of variables solved for
+ * - repeat
+ *
+ * Need to figure out the following:
+ *
+ * - how do we support solving the same system multiple times
+ *   with different values, e.g. animating and object and
+ *   ensure related objects update based on constraints
+ */
 
+class Solver {
+    constructor() {
+        this.constraints = [];
+    }
 
-var x, y;
+    addConstraint(cn) {
+        this.constraints.push(cn);
+    }
 
-// example 1
-x = new Variable(5);
-y = new Variable(0);
+    variables() {
+        return this.constraints.reduce((accumulator, cn) =>
+            new Set([...accumulator, ...cn.expr.variables()]), new Set());
+    }
 
-x.fixed = true;
+    solve() {
+        // reset all values to undefined
+        let vars = this.variables();
+        vars.forEach(v => v.value = undefined);
 
-var cn = new Constraint(x, "==", new Expression(2, y));
-console.log(`isSatisfied = ${cn.isSatisfied()}`);
-console.log(`isSatisfiable = ${cn.isSatisfiable()}`);
+        let totalSatisfiedCount = 0;
+        let constraintCount = this.constraints.length;
 
-console.log(cn.toString());
+        while (totalSatisfiedCount < constraintCount) {
+            let satisfiedCount = 0;
+            this.constraints.forEach(cn => {
+                if (cn.isSatisfiable()) {
+                    if (cn.expr.freeVariables().length === 1) {
+                        cn.satisfy();
+                        satisfiedCount++;
+                    }
+                } else {
+                    throw new Error("unsatifiable constraint");
+                }
+            });
+            if (satisfiedCount === 0) {
+                throw new Error("unable to solve all constraints");
+            }
+            totalSatisfiedCount += satisfiedCount;
+        }
+    }
+}
 
-cn.satisfy();
-
-console.log(`x = ${x}, y = ${y}`);
-console.log(`isSatisfied = ${cn.isSatisfied()}`);
-
-console.log("");
-
-
-// example 2
-x.value = 25;
-
-var e1 = new Expression(1, y);
-var e2 = (new Expression(2, x)).add(5);
-
-var cn2 = new Constraint(e1, "==", e2);
-console.log(cn2.toString());
-
-cn2.satisfy();
-
-console.log(`x = ${x}, y = ${y}`);
-console.log("");
-
-
-// example 3
-x.fixed = false;
-y.fixed = false;
-
-let w = new Variable(100);
-let h = new Variable(25);
-
-w.fixed = true;
-h.fixed = true;
-
-let cx = new Variable(80);
-let cy = new Variable(50);
-
-cx.fixed = true;
-cy.fixed = true;
-
-// these two expressions don't share any variables
-let e3 = (new Expression(1, x)).add(0.5, w);
-let e4 = (new Expression(1, y)).add(0.5, h);
-
-let cn3 = new Constraint(cx, "==", e3);
-let cn4 = new Constraint(cy, "==", e4);
-
-cn3.satisfy();
-cn4.satisfy();
-
-console.log(cn3.toString());
-console.log(cn4.toString());
-console.log(`x = ${x}, y = ${y}`);
-console.log(`isSatisfied = ${cn3.isSatisfied()}`);
-console.log(`isSatisfied = ${cn4.isSatisfied()}`);
+module.exports = Solver;
