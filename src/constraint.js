@@ -7,15 +7,16 @@ class Constraint {
     }
 
     update(left, comp, right) {
-        if (left instanceof Variable) {
-            left = new Expression(1, left);
-        } else if (Number.isFinite(left)) {
+        if (Number.isFinite(left)) {
             left = new Expression(left);
+        } else {
+            left = new Expression(1, left);
         }
-        if (right instanceof Variable) {
-            right = new Expression(1, right);
-        } else if (Number.isFinite(right)) {
+
+        if (Number.isFinite(right)) {
             right = new Expression(right);
+        } else {
+            right = new Expression(1, right);
         }
 
         this.expr = new Expression();
@@ -32,7 +33,7 @@ class Constraint {
         var epsilon = Number.EPSILON;
 
         switch (this.comp) {
-            case "==": return Math.abs(this.expr.value()) < epsilon;
+            case "==": return Math.abs(this.expr.value) < epsilon;
         }
 
         throw new Error("invalid comparison operator");

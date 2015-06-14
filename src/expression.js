@@ -1,10 +1,27 @@
 let Variable = require('./variable');
 
+
 class Expression {
-    constructor(coeff = 0, variable = null) {
-        this.terms = [];
-        // TODO: create a Term object
-        this.terms.push({ coeff, variable });
+    /**
+     *
+     * @param coeff
+     * @param {Expression} term
+     */
+    constructor(coeff = 0, term = null) {
+        this.terms = [];    // TODO: create a Term object
+
+        if (term instanceof Variable || term === null) {
+            this.terms.push({ coeff, variable: term });
+        } else if (term instanceof Expression) {
+            term.terms.forEach(t => {
+                this.terms.push({
+                    coeff: t.coeff * coeff,
+                    variable: t.variable
+                });
+            });
+        } else {
+            throw new Error("can't handle this kind of term");
+        }
     }
 
     add(coeff, variable) {
@@ -17,7 +34,14 @@ class Expression {
         return this;
     }
 
-    value() {
+    clone() {
+        let expr = new Expression();
+        expr.terms = [];
+        this.terms.forEach(t => expr.terms.push(t));
+        return expr;
+    }
+
+    get value() {
         var sum = 0;
         this.terms.forEach(t => {
             if (t.variable) {

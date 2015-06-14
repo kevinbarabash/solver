@@ -41,6 +41,10 @@ class Solver {
 
         while (totalSatisfiedCount < constraintCount) {
             let satisfiedCount = 0;
+
+            // we should really have some arrays that we move contraints
+            // between as they become satisfied... in some cases satisfying
+            // one constraint will actually satisfy multiple constraints
             this.constraints.forEach(cn => {
                 if (cn.isSatisfiable()) {
                     if (cn.expr.freeVariables().length === 1) {
@@ -52,6 +56,9 @@ class Solver {
                 }
             });
             if (satisfiedCount === 0) {
+                if (this.constraints.every(cn => cn.isSatisfied)) {
+                    break;
+                }
                 throw new Error("unable to solve all constraints");
             }
             totalSatisfiedCount += satisfiedCount;

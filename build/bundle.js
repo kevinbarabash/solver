@@ -46,51 +46,74 @@
 
 	'use strict';
 
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
 	var Variable = __webpack_require__(1);
 	var Expression = __webpack_require__(2);
 	var Constraint = __webpack_require__(3);
 	var Solver = __webpack_require__(4);
 
-	var r1 = {
-	    x: new Variable(),
-	    y: new Variable(),
-	    w: new Variable(),
-	    h: new Variable()
+	var Rect = function Rect(name) {
+	    _classCallCheck(this, Rect);
+
+	    if (name) {
+	        return {
+	            x: new Variable(name + '.x'),
+	            y: new Variable(name + '.y'),
+	            w: new Variable(name + '.w'),
+	            h: new Variable(name + '.h')
+	        };
+	    } else {
+	        return {
+	            x: new Variable(),
+	            y: new Variable(),
+	            w: new Variable(),
+	            h: new Variable()
+	        };
+	    }
 	};
 
-	var r2 = {
-	    x: new Variable(),
-	    y: new Variable(),
-	    w: new Variable(),
-	    h: new Variable()
-	};
+	var r1 = new Rect('r1');
+	var r2 = new Rect('r2');
+	var bar = new Rect('bar');
 
 	// these two expressions don't share any variables
 	r1.cx = new Expression(1, r1.x).add(0.5, r1.w);
 	r1.cy = new Expression(1, r1.y).add(0.5, r1.h);
 	r2.cx = new Expression(1, r2.x).add(0.5, r2.w);
 	r2.cy = new Expression(1, r2.y).add(0.5, r2.h);
+	bar.cx = new Expression(1, bar.x).add(0.5, bar.w);
+	bar.cy = new Expression(1, bar.y).add(0.5, bar.h);
 
 	var solver = new Solver();
 	solver.addConstraint(new Constraint(r1.w, '==', 175));
 	solver.addConstraint(new Constraint(r1.h, '==', 125));
 	solver.addConstraint(new Constraint(r2.w, '==', 225));
 	solver.addConstraint(new Constraint(r2.h, '==', 75));
+	solver.addConstraint(new Constraint(bar.w, '==', 225));
+	solver.addConstraint(new Constraint(bar.h, '==', 5));
 
 	var gap = 25;
-	r1.bottom = new Expression(1, r1.y).add(1, r1.h).add(gap);
+	r1.bottom = new Expression(1, r1.y).add(1, r1.h);
+	// Note: r1.bottom is an expression, so we're creating expressions from
+	// sub expressions here
+	//let between = (new Expression(0.5, r1.bottom)).add(0.5, r2.y);
 
-	solver.addConstraint(new Constraint(r2.y, '==', r1.bottom));
+	solver.addConstraint(new Constraint(r2.y, '==', r1.bottom.clone().add(gap)));
 	solver.addConstraint(new Constraint(r1.cx, '==', r2.cx));
+	solver.addConstraint(new Constraint(bar.cx, '==', r1.cx));
+	solver.addConstraint(new Constraint(r2.y, '==', new Expression(1, bar.cy).add(gap / 2)));
+	solver.addConstraint(new Constraint(r1.bottom, '==', new Expression(1, bar.cy).sub(gap / 2)));
 
-	var cx_cn = solver.addConstraint(new Constraint(r1.cx, '==', 300));
-	var cy_cn = solver.addConstraint(new Constraint(r1.cy, '==', 200));
+	//let cn = solver.addConstraint(new Constraint(bar.cy, "==", between));
+
+	var cx_cn = solver.addConstraint(new Constraint(bar.cx, '==', 300));
+	var cy_cn = solver.addConstraint(new Constraint(bar.cy, '==', 200));
 
 	solver.solve();
 
-	Object.keys(r1).forEach(function (id) {
-	    console.log('' + id + ' = ' + r1[id].value);
-	});
+	console.log('cx_cn = ' + cx_cn);
+	console.log('cy_cn = ' + cy_cn);
 
 	document.body.style.backgroundColor = 'gray';
 	document.body.style.margin = 0;
@@ -110,6 +133,9 @@
 	    ctx.fillStyle = 'blue';
 	    ctx.fillRect(r2.x.value, r2.y.value, r2.w.value, r2.h.value);
 
+	    ctx.fillStyle = 'black';
+	    ctx.fillRect(bar.x.value, bar.y.value, bar.w.value, bar.h.value);
+
 	    ctx.beginPath();
 	    ctx.arc(x, y, 3, 0, 2 * Math.PI, false);
 	    ctx.fillStyle = 'black';
@@ -127,8 +153,8 @@
 	    if (down) {
 	        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	        cx_cn.update(r1.cx, '==', e.pageX);
-	        cy_cn.update(r1.cy, '==', e.pageY);
+	        cx_cn.update(bar.cx, '==', e.pageX);
+	        cy_cn.update(bar.cy, '==', e.pageY);
 
 	        solver.solve();
 
@@ -155,19 +181,22 @@
 	var id = 0;
 
 	var Variable = (function () {
-	    function Variable() {
-	        var value = arguments[0] === undefined ? 0 : arguments[0];
-
+	    function Variable(name) {
 	        _classCallCheck(this, Variable);
 
-	        Object.assign(this, { value: value });
+	        Object.assign(this, { name: name });
+	        this.value = undefined;
 	        this.id = id++;
 	    }
 
 	    _createClass(Variable, [{
 	        key: "toString",
 	        value: function toString() {
-	            return "[v" + this.id + ":" + this.value + "]";
+	            if (this.name) {
+	                return "[" + this.name + ":" + this.value + "]";
+	            } else {
+	                return "[v" + this.id + ":" + this.value + "]";
+	            }
 	        }
 
 	        // TODO: global look up based on id
@@ -192,15 +221,34 @@
 	var Variable = __webpack_require__(1);
 
 	var Expression = (function () {
+	    /**
+	     *
+	     * @param coeff
+	     * @param {Expression} term
+	     */
+
 	    function Expression() {
+	        var _this = this;
+
 	        var coeff = arguments[0] === undefined ? 0 : arguments[0];
-	        var variable = arguments[1] === undefined ? null : arguments[1];
+	        var term = arguments[1] === undefined ? null : arguments[1];
 
 	        _classCallCheck(this, Expression);
 
-	        this.terms = [];
-	        // TODO: create a Term object
-	        this.terms.push({ coeff: coeff, variable: variable });
+	        this.terms = []; // TODO: create a Term object
+
+	        if (term instanceof Variable || term === null) {
+	            this.terms.push({ coeff: coeff, variable: term });
+	        } else if (term instanceof Expression) {
+	            term.terms.forEach(function (t) {
+	                _this.terms.push({
+	                    coeff: t.coeff * coeff,
+	                    variable: t.variable
+	                });
+	            });
+	        } else {
+	            throw new Error("can't handle this kind of term");
+	        }
 	    }
 
 	    _createClass(Expression, [{
@@ -216,17 +264,14 @@
 	            return this;
 	        }
 	    }, {
-	        key: "value",
-	        value: function value() {
-	            var sum = 0;
+	        key: "clone",
+	        value: function clone() {
+	            var expr = new Expression();
+	            expr.terms = [];
 	            this.terms.forEach(function (t) {
-	                if (t.variable) {
-	                    sum += t.coeff * t.variable.value;
-	                } else {
-	                    sum += t.coeff;
-	                }
+	                return expr.terms.push(t);
 	            });
-	            return sum;
+	            return expr;
 	        }
 	    }, {
 	        key: "freeVariables",
@@ -280,6 +325,19 @@
 	        }
 	        // TODO: collect_like_terms
 
+	    }, {
+	        key: "value",
+	        get: function () {
+	            var sum = 0;
+	            this.terms.forEach(function (t) {
+	                if (t.variable) {
+	                    sum += t.coeff * t.variable.value;
+	                } else {
+	                    sum += t.coeff;
+	                }
+	            });
+	            return sum;
+	        }
 	    }]);
 
 	    return Expression;
@@ -312,15 +370,16 @@
 	        value: function update(left, comp, right) {
 	            var _this = this;
 
-	            if (left instanceof Variable) {
-	                left = new Expression(1, left);
-	            } else if (Number.isFinite(left)) {
+	            if (Number.isFinite(left)) {
 	                left = new Expression(left);
+	            } else {
+	                left = new Expression(1, left);
 	            }
-	            if (right instanceof Variable) {
-	                right = new Expression(1, right);
-	            } else if (Number.isFinite(right)) {
+
+	            if (Number.isFinite(right)) {
 	                right = new Expression(right);
+	            } else {
+	                right = new Expression(1, right);
 	            }
 
 	            this.expr = new Expression();
@@ -343,7 +402,7 @@
 
 	            switch (this.comp) {
 	                case '==':
-	                    return Math.abs(this.expr.value()) < epsilon;
+	                    return Math.abs(this.expr.value) < epsilon;
 	            }
 
 	            throw new Error('invalid comparison operator');
@@ -475,6 +534,10 @@
 
 	            var _loop = function () {
 	                var satisfiedCount = 0;
+
+	                // we should really have some arrays that we move contraints
+	                // between as they become satisfied... in some cases satisfying
+	                // one constraint will actually satisfy multiple constraints
 	                _this.constraints.forEach(function (cn) {
 	                    if (cn.isSatisfiable()) {
 	                        if (cn.expr.freeVariables().length === 1) {
@@ -486,13 +549,20 @@
 	                    }
 	                });
 	                if (satisfiedCount === 0) {
+	                    if (_this.constraints.every(function (cn) {
+	                        return cn.isSatisfied;
+	                    })) {
+	                        return "break";
+	                    }
 	                    throw new Error("unable to solve all constraints");
 	                }
 	                totalSatisfiedCount += satisfiedCount;
 	            };
 
 	            while (totalSatisfiedCount < constraintCount) {
-	                _loop();
+	                var _ret = _loop();
+
+	                if (_ret === "break") break;
 	            }
 	        }
 	    }]);
