@@ -83,8 +83,8 @@
 	solver.addConstraint(new Constraint(r2.y, '==', r1.bottom));
 	solver.addConstraint(new Constraint(r1.cx, '==', r2.cx));
 
-	solver.addConstraint(new Constraint(r1.cx, '==', 300));
-	solver.addConstraint(new Constraint(r1.cy, '==', 200));
+	var cx_cn = solver.addConstraint(new Constraint(r1.cx, '==', 300));
+	var cy_cn = solver.addConstraint(new Constraint(r1.cy, '==', 200));
 
 	solver.solve();
 
@@ -103,16 +103,44 @@
 
 	var ctx = canvas.getContext('2d');
 
-	ctx.fillStyle = 'red';
-	ctx.fillRect(r1.x.value, r1.y.value, r1.w.value, r1.h.value);
+	var draw = function draw(x, y) {
+	    ctx.fillStyle = 'red';
+	    ctx.fillRect(r1.x.value, r1.y.value, r1.w.value, r1.h.value);
 
-	ctx.fillStyle = 'blue';
-	ctx.fillRect(r2.x.value, r2.y.value, r2.w.value, r2.h.value);
+	    ctx.fillStyle = 'blue';
+	    ctx.fillRect(r2.x.value, r2.y.value, r2.w.value, r2.h.value);
 
-	ctx.beginPath();
-	ctx.arc(300, 200, 3, 0, 2 * Math.PI, false);
-	ctx.fillStyle = 'black';
-	ctx.fill();
+	    ctx.beginPath();
+	    ctx.arc(x, y, 3, 0, 2 * Math.PI, false);
+	    ctx.fillStyle = 'black';
+	    ctx.fill();
+	};
+
+	draw(300, 200);
+
+	var down = false;
+	document.addEventListener('mousedown', function (e) {
+	    down = true;
+	});
+
+	document.addEventListener('mousemove', function (e) {
+	    if (down) {
+	        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	        cx_cn.update(r1.cx, '==', e.pageX);
+	        cy_cn.update(r1.cy, '==', e.pageY);
+
+	        solver.solve();
+
+	        draw(e.pageX, e.pageY);
+	    }
+	});
+
+	document.addEventListener('mouseup', function (e) {
+	    if (down) {
+	        down = false;
+	    }
+	});
 
 /***/ },
 /* 1 */
@@ -274,35 +302,40 @@
 
 	var Constraint = (function () {
 	    function Constraint(left, comp, right) {
-	        var _this = this;
-
 	        _classCallCheck(this, Constraint);
 
-	        if (left instanceof Variable) {
-	            left = new Expression(1, left);
-	        } else if (Number.isFinite(left)) {
-	            left = new Expression(left);
-	        }
-	        if (right instanceof Variable) {
-	            right = new Expression(1, right);
-	        } else if (Number.isFinite(right)) {
-	            right = new Expression(right);
-	        }
-
-	        this.expr = new Expression();
-
-	        left.terms.forEach(function (t) {
-	            return _this.expr.add(t.coeff, t.variable);
-	        });
-	        right.terms.forEach(function (t) {
-	            return _this.expr.add(-t.coeff, t.variable);
-	        });
-
-	        this.expr.collectLikeTerms();
-	        this.comp = comp;
+	        this.update(left, comp, right);
 	    }
 
 	    _createClass(Constraint, [{
+	        key: 'update',
+	        value: function update(left, comp, right) {
+	            var _this = this;
+
+	            if (left instanceof Variable) {
+	                left = new Expression(1, left);
+	            } else if (Number.isFinite(left)) {
+	                left = new Expression(left);
+	            }
+	            if (right instanceof Variable) {
+	                right = new Expression(1, right);
+	            } else if (Number.isFinite(right)) {
+	                right = new Expression(right);
+	            }
+
+	            this.expr = new Expression();
+
+	            left.terms.forEach(function (t) {
+	                return _this.expr.add(t.coeff, t.variable);
+	            });
+	            right.terms.forEach(function (t) {
+	                return _this.expr.add(-t.coeff, t.variable);
+	            });
+
+	            this.expr.collectLikeTerms();
+	            this.comp = comp;
+	        }
+	    }, {
 	        key: 'isSatisfied',
 	        value: function isSatisfied() {
 	            // this might be too small
@@ -417,6 +450,7 @@
 	        key: "addConstraint",
 	        value: function addConstraint(cn) {
 	            this.constraints.push(cn);
+	            return cn;
 	        }
 	    }, {
 	        key: "variables",

@@ -36,8 +36,8 @@ r1.bottom = (new Expression(1, r1.y)).add(1, r1.h).add(gap);
 solver.addConstraint(new Constraint(r2.y, "==", r1.bottom));
 solver.addConstraint(new Constraint(r1.cx, "==", r2.cx));
 
-solver.addConstraint(new Constraint(r1.cx, "==", 300));
-solver.addConstraint(new Constraint(r1.cy, "==", 200));
+let cx_cn = solver.addConstraint(new Constraint(r1.cx, "==", 300));
+let cy_cn = solver.addConstraint(new Constraint(r1.cy, "==", 200));
 
 solver.solve();
 
@@ -57,13 +57,41 @@ document.body.appendChild(canvas);
 
 var ctx = canvas.getContext('2d');
 
-ctx.fillStyle = 'red';
-ctx.fillRect(r1.x.value, r1.y.value, r1.w.value, r1.h.value);
+let draw = function (x, y) {
+    ctx.fillStyle = 'red';
+    ctx.fillRect(r1.x.value, r1.y.value, r1.w.value, r1.h.value);
 
-ctx.fillStyle = 'blue';
-ctx.fillRect(r2.x.value, r2.y.value, r2.w.value, r2.h.value);
+    ctx.fillStyle = 'blue';
+    ctx.fillRect(r2.x.value, r2.y.value, r2.w.value, r2.h.value);
 
-ctx.beginPath();
-ctx.arc(300, 200, 3, 0, 2 * Math.PI, false);
-ctx.fillStyle = 'black';
-ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, 2 * Math.PI, false);
+    ctx.fillStyle = 'black';
+    ctx.fill();
+};
+
+draw(300, 200);
+
+let down = false;
+document.addEventListener('mousedown', e => {
+    down = true;
+});
+
+document.addEventListener('mousemove', e => {
+    if (down) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        cx_cn.update(r1.cx, "==", e.pageX);
+        cy_cn.update(r1.cy, "==", e.pageY);
+
+        solver.solve();
+
+        draw(e.pageX, e.pageY);
+    }
+});
+
+document.addEventListener('mouseup', e => {
+    if (down) {
+        down = false;
+    }
+});

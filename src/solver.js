@@ -23,6 +23,7 @@ class Solver {
 
     addConstraint(cn) {
         this.constraints.push(cn);
+        return cn;
     }
 
     variables() {

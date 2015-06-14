@@ -3,6 +3,10 @@ let Expression = require('./expression');
 
 class Constraint {
     constructor(left, comp, right) {
+        this.update(left, comp, right);
+    }
+
+    update(left, comp, right) {
         if (left instanceof Variable) {
             left = new Expression(1, left);
         } else if (Number.isFinite(left)) {
