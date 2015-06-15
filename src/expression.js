@@ -55,7 +55,7 @@ class Expression {
 
     freeVariables() {
         return this.terms.filter(t => {
-            return t.variable && !t.variable.value
+            return t.variable && t.variable.value == undefined
         }).map(t => t.variable);
     }
 

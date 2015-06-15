@@ -46,74 +46,53 @@
 
 	'use strict';
 
-	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
-
 	var Variable = __webpack_require__(1);
 	var Expression = __webpack_require__(2);
 	var Constraint = __webpack_require__(3);
 	var Solver = __webpack_require__(4);
+	var Rect = __webpack_require__(5);
+	var Layout = __webpack_require__(6);
 
-	var Rect = function Rect(name) {
-	    _classCallCheck(this, Rect);
+	var layout1 = Layout.createFraction(300, 100, 200, 75);
+	var layout2 = Layout.createFraction(150, 50, 225, 40);
 
-	    if (name) {
-	        return {
-	            x: new Variable(name + '.x'),
-	            y: new Variable(name + '.y'),
-	            w: new Variable(name + '.w'),
-	            h: new Variable(name + '.h')
-	        };
-	    } else {
-	        return {
-	            x: new Variable(),
-	            y: new Variable(),
-	            w: new Variable(),
-	            h: new Variable()
-	        };
-	    }
-	};
+	var solver = new Solver();
+
+	var bounds1 = layout1.bounds();
+	var bounds2 = layout2.bounds();
+	// TODO: provide a getter for the layout's "origin"
 
 	var r1 = new Rect('r1');
 	var r2 = new Rect('r2');
-	var bar = new Rect('bar');
 
-	// these two expressions don't share any variables
-	r1.cx = new Expression(1, r1.x).add(0.5, r1.w);
-	r1.cy = new Expression(1, r1.y).add(0.5, r1.h);
-	r2.cx = new Expression(1, r2.x).add(0.5, r2.w);
-	r2.cy = new Expression(1, r2.y).add(0.5, r2.h);
-	bar.cx = new Expression(1, bar.x).add(0.5, bar.w);
-	bar.cy = new Expression(1, bar.y).add(0.5, bar.h);
+	console.log(bounds1);
+	console.log(bounds2);
 
-	var solver = new Solver();
-	solver.addConstraint(new Constraint(r1.w, '==', 175));
-	solver.addConstraint(new Constraint(r1.h, '==', 125));
-	solver.addConstraint(new Constraint(r2.w, '==', 225));
-	solver.addConstraint(new Constraint(r2.h, '==', 75));
-	solver.addConstraint(new Constraint(bar.w, '==', 225));
-	solver.addConstraint(new Constraint(bar.h, '==', 5));
+	solver.addConstraint(new Constraint(r1.w, '==', bounds1.right - bounds1.left));
+	solver.addConstraint(new Constraint(r1.h, '==', bounds1.bottom - bounds1.top));
 
-	var gap = 25;
-	r1.bottom = new Expression(1, r1.y).add(1, r1.h);
-	// Note: r1.bottom is an expression, so we're creating expressions from
-	// sub expressions here
-	//let between = (new Expression(0.5, r1.bottom)).add(0.5, r2.y);
+	solver.addConstraint(new Constraint(r2.w, '==', bounds2.right - bounds2.left));
+	solver.addConstraint(new Constraint(r2.h, '==', bounds2.bottom - bounds2.top));
 
-	solver.addConstraint(new Constraint(r2.y, '==', r1.bottom.clone().add(gap)));
-	solver.addConstraint(new Constraint(r1.cx, '==', r2.cx));
-	solver.addConstraint(new Constraint(bar.cx, '==', r1.cx));
-	solver.addConstraint(new Constraint(r2.y, '==', new Expression(1, bar.cy).add(gap / 2)));
-	solver.addConstraint(new Constraint(r1.bottom, '==', new Expression(1, bar.cy).sub(gap / 2)));
+	// x, y is the "origin" of the layouts
+	// TODO: that needs to be made more clear
+	var left2 = new Expression(1, r2.x).sub(0.5, r2.w);
+	var right1 = new Expression(1, r1.x).add(0.5, r1.w);
 
-	//let cn = solver.addConstraint(new Constraint(bar.cy, "==", between));
-
-	var cx_cn = solver.addConstraint(new Constraint(bar.cx, '==', 300));
-	var cy_cn = solver.addConstraint(new Constraint(bar.cy, '==', 200));
+	solver.addConstraint(new Constraint(left2, '==', right1));
+	solver.addConstraint(new Constraint(left2, '==', 0));
 
 	solver.solve();
 
-	console.log('cx_cn = ' + cx_cn);
-	console.log('cy_cn = ' + cy_cn);
+	solver.constraints.forEach(function (cn) {
+	    console.log(cn.isSatisfied());
+	});
+
+	console.log(r1.toString());
+	console.log(r2.toString());
+
+	layout1.translation[0] = r1.x.value;
+	layout2.translation[0] = r2.x.value;
 
 	document.body.style.backgroundColor = 'gray';
 	document.body.style.margin = 0;
@@ -125,16 +104,24 @@
 	document.body.appendChild(canvas);
 
 	var ctx = canvas.getContext('2d');
+	ctx.translate(500, 350);
 
 	var draw = function draw(x, y) {
-	    ctx.fillStyle = 'red';
-	    ctx.fillRect(r1.x.value, r1.y.value, r1.w.value, r1.h.value);
+	    ctx.setTransform(1, 0, 0, 1, 0, 0);
+	    ctx.clearRect(0, 0, canvas.width, canvas.height);
+	    ctx.translate(500, 350);
 
-	    ctx.fillStyle = 'blue';
-	    ctx.fillRect(r2.x.value, r2.y.value, r2.w.value, r2.h.value);
+	    ctx.strokeStyle = 'black';
 
-	    ctx.fillStyle = 'black';
-	    ctx.fillRect(bar.x.value, bar.y.value, bar.w.value, bar.h.value);
+	    ctx.beginPath();
+	    ctx.moveTo(-250, 0);
+	    ctx.lineTo(255, 0);
+	    ctx.moveTo(0, -250);
+	    ctx.lineTo(0, 250);
+	    ctx.stroke();
+
+	    layout1.draw(ctx);
+	    layout2.draw(ctx);
 
 	    ctx.beginPath();
 	    ctx.arc(x, y, 3, 0, 2 * Math.PI, false);
@@ -142,7 +129,7 @@
 	    ctx.fill();
 	};
 
-	draw(300, 200);
+	draw(0, 0);
 
 	var down = false;
 	document.addEventListener('mousedown', function (e) {
@@ -151,14 +138,19 @@
 
 	document.addEventListener('mousemove', function (e) {
 	    if (down) {
-	        ctx.clearRect(0, 0, canvas.width, canvas.height);
+	        var x = e.pageX - 500;
+	        var y = e.pageY - 350;
 
-	        cx_cn.update(bar.cx, '==', e.pageX);
-	        cy_cn.update(bar.cy, '==', e.pageY);
+	        // TODO: create a small example showing updates
+	        // don't need to update these constraints
+	        // infact for glyph layout1 we'll only have static constraints
+	        //cx_cn.update(bar.cx, "==", x);
+	        //cy_cn.update(bar.cy, "==", y);
+	        //solver1.solve();
 
-	        solver.solve();
+	        //layout1.translation = [x, y];
 
-	        draw(e.pageX, e.pageY);
+	        draw(x, y);
 	    }
 	});
 
@@ -277,7 +269,7 @@
 	        key: "freeVariables",
 	        value: function freeVariables() {
 	            return this.terms.filter(function (t) {
-	                return t.variable && !t.variable.value;
+	                return t.variable && t.variable.value == undefined;
 	            }).map(function (t) {
 	                return t.variable;
 	            });
@@ -571,6 +563,181 @@
 	})();
 
 	module.exports = Solver;
+
+/***/ },
+/* 5 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+
+	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+	var Variable = __webpack_require__(1);
+
+	var Rect = (function () {
+	    function Rect(name, color) {
+	        _classCallCheck(this, Rect);
+
+	        this.x = new Variable(name + ".x");
+	        this.y = new Variable(name + ".y");
+	        this.w = new Variable(name + ".w");
+	        this.h = new Variable(name + ".h");
+	        this.color = color;
+	    }
+
+	    _createClass(Rect, [{
+	        key: "draw",
+	        value: function draw(ctx) {
+	            ctx.fillStyle = this.color;
+	            ctx.fillRect(this.x.value, this.y.value, this.w.value, this.h.value);
+	        }
+	    }, {
+	        key: "toString",
+	        value: function toString() {
+	            return [this.x, this.y, this.w, this.h].map(function (v) {
+	                return v.toString();
+	            }).join(":");
+	        }
+	    }, {
+	        key: "left",
+	        get: function () {
+	            return this.x.value;
+	        }
+	    }, {
+	        key: "right",
+	        get: function () {
+	            return this.x.value + this.w.value;
+	        }
+	    }, {
+	        key: "top",
+	        get: function () {
+	            return this.y.value;
+	        }
+	    }, {
+	        key: "bottom",
+	        get: function () {
+	            return this.y.value + this.h.value;
+	        }
+	    }]);
+
+	    return Rect;
+	})();
+
+	module.exports = Rect;
+
+/***/ },
+/* 6 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+	function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } }
+
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+	var Rect = __webpack_require__(5);
+	var Expression = __webpack_require__(2);
+	var Solver = __webpack_require__(4);
+	var Constraint = __webpack_require__(3);
+
+	var Layout = (function () {
+	    function Layout() {
+	        _classCallCheck(this, Layout);
+
+	        this.translation = [0, 0];
+	        this.children = [];
+	    }
+
+	    _createClass(Layout, [{
+	        key: 'addChild',
+	        value: function addChild(child) {
+	            this.children.push(child);
+	        }
+	    }, {
+	        key: 'bounds',
+	        value: function bounds() {
+	            var inital = {
+	                left: Infinity,
+	                right: -Infinity,
+	                top: Infinity,
+	                bottom: -Infinity
+	            };
+	            return this.children.reduce(function (bounds, child) {
+	                bounds.left = Math.min(bounds.left, child.left);
+	                bounds.right = Math.max(bounds.right, child.right);
+	                bounds.top = Math.min(bounds.top, child.top);
+	                bounds.bottom = Math.max(bounds.bottom, child.bottom);
+	                return bounds;
+	            }, inital);
+	        }
+	    }, {
+	        key: 'draw',
+	        value: function draw(ctx) {
+	            var bounds = this.bounds();
+
+	            ctx.save();
+	            ctx.translate.apply(ctx, _toConsumableArray(this.translation));
+	            this.children.forEach(function (child) {
+	                return child.draw(ctx);
+	            });
+	            ctx.strokeStyle = 'black';
+	            ctx.strokeRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+	            ctx.restore();
+	        }
+	    }]);
+
+	    return Layout;
+	})();
+
+	Layout.createFraction = function (num_w, num_h, den_w, den_h) {
+	    var r1 = new Rect('r1', 'rgba(255,0,0,0.5)');
+	    var r2 = new Rect('r2', 'rgba(0,0,255,0.5)');
+	    var bar = new Rect('bar', 'rgba(0,0,0,0.5)');
+
+	    var layout1 = new Layout();
+	    layout1.addChild(r1);
+	    layout1.addChild(r2);
+	    layout1.addChild(bar);
+
+	    // these two expressions don't share any variables
+	    r1.cx = new Expression(1, r1.x).add(0.5, r1.w);
+	    r1.cy = new Expression(1, r1.y).add(0.5, r1.h);
+	    r2.cx = new Expression(1, r2.x).add(0.5, r2.w);
+	    r2.cy = new Expression(1, r2.y).add(0.5, r2.h);
+	    bar.cx = new Expression(1, bar.x).add(0.5, bar.w);
+	    bar.cy = new Expression(1, bar.y).add(0.5, bar.h);
+
+	    var solver1 = new Solver();
+	    solver1.addConstraint(new Constraint(r1.w, '==', num_w));
+	    solver1.addConstraint(new Constraint(r1.h, '==', num_h));
+	    solver1.addConstraint(new Constraint(r2.w, '==', den_w));
+	    solver1.addConstraint(new Constraint(r2.h, '==', den_h));
+	    solver1.addConstraint(new Constraint(bar.w, '==', Math.max(num_w, den_w)));
+	    solver1.addConstraint(new Constraint(bar.h, '==', 5));
+
+	    var gap = 25;
+	    var bottom = new Expression(1, r1.y).add(1, r1.h);
+	    // Note: bottom is an expression, so we're creating expressions from
+	    // sub expressions here
+	    //let between = (new Expression(0.5, bottom)).add(0.5, r2.y);
+
+	    solver1.addConstraint(new Constraint(r2.y, '==', bottom.clone().add(gap)));
+	    solver1.addConstraint(new Constraint(r1.cx, '==', r2.cx));
+	    solver1.addConstraint(new Constraint(bar.cx, '==', r1.cx));
+	    solver1.addConstraint(new Constraint(r2.y, '==', new Expression(1, bar.cy).add(gap / 2)));
+	    solver1.addConstraint(new Constraint(bottom, '==', new Expression(1, bar.cy).sub(gap / 2)));
+	    solver1.addConstraint(new Constraint(bar.cx, '==', 0));
+	    solver1.addConstraint(new Constraint(bar.cy, '==', 0));
+	    solver1.solve();
+
+	    return layout1;
+	};
+
+	module.exports = Layout;
 
 /***/ }
 /******/ ]);

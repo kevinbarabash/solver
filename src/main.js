@@ -2,69 +2,52 @@ let Variable = require('./variable');
 let Expression = require('./expression');
 let Constraint = require('./constraint');
 let Solver = require('./solver');
+let Rect = require('./rect');
+let Layout = require('./layout');
 
-class Rect {
-    constructor(name) {
-        if (name) {
-            return {
-                x: new Variable(name + ".x"),
-                y: new Variable(name + ".y"),
-                w: new Variable(name + ".w"),
-                h: new Variable(name + ".h")
-            };
-        } else {
-            return {
-                x: new Variable(),
-                y: new Variable(),
-                w: new Variable(),
-                h: new Variable()
-            };
-        }
-    }
-}
+
+let layout1 = Layout.createFraction(300,100,200,75);
+let layout2 = Layout.createFraction(150,50,225,40);
+
+let solver = new Solver();
+
+let bounds1 = layout1.bounds();
+let bounds2 = layout2.bounds();
+// TODO: provide a getter for the layout's "origin"
 
 let r1 = new Rect("r1");
 let r2 = new Rect("r2");
-let bar = new Rect("bar");
 
+console.log(bounds1);
+console.log(bounds2);
 
-// these two expressions don't share any variables
-r1.cx = (new Expression(1, r1.x)).add(0.5, r1.w);
-r1.cy = (new Expression(1, r1.y)).add(0.5, r1.h);
-r2.cx = (new Expression(1, r2.x)).add(0.5, r2.w);
-r2.cy = (new Expression(1, r2.y)).add(0.5, r2.h);
-bar.cx = (new Expression(1, bar.x)).add(0.5, bar.w);
-bar.cy = (new Expression(1, bar.y)).add(0.5, bar.h);
+solver.addConstraint(new Constraint(r1.w, "==", bounds1.right - bounds1.left));
+solver.addConstraint(new Constraint(r1.h, "==", bounds1.bottom - bounds1.top));
 
-let solver = new Solver();
-solver.addConstraint(new Constraint(r1.w, "==", 175));
-solver.addConstraint(new Constraint(r1.h, "==", 125));
-solver.addConstraint(new Constraint(r2.w, "==", 225));
-solver.addConstraint(new Constraint(r2.h, "==", 75));
-solver.addConstraint(new Constraint(bar.w, "==", 225));
-solver.addConstraint(new Constraint(bar.h, "==", 5));
+solver.addConstraint(new Constraint(r2.w, "==", bounds2.right - bounds2.left));
+solver.addConstraint(new Constraint(r2.h, "==", bounds2.bottom - bounds2.top));
 
-let gap = 25;
-r1.bottom = (new Expression(1, r1.y)).add(1, r1.h);
-// Note: r1.bottom is an expression, so we're creating expressions from
-// sub expressions here
-//let between = (new Expression(0.5, r1.bottom)).add(0.5, r2.y);
+// x, y is the "origin" of the layouts
+// TODO: that needs to be made more clear
+let left2 = (new Expression(1, r2.x)).sub(0.5, r2.w);
+let right1 = (new Expression(1, r1.x)).add(0.5, r1.w);
 
-solver.addConstraint(new Constraint(r2.y, "==", r1.bottom.clone().add(gap)));
-solver.addConstraint(new Constraint(r1.cx, "==", r2.cx));
-solver.addConstraint(new Constraint(bar.cx, "==", r1.cx));
-solver.addConstraint(new Constraint(r2.y, "==", (new Expression(1, bar.cy)).add(gap/2)));
-solver.addConstraint(new Constraint(r1.bottom, "==", (new Expression(1, bar.cy)).sub(gap/2)));
-
-//let cn = solver.addConstraint(new Constraint(bar.cy, "==", between));
-
-let cx_cn = solver.addConstraint(new Constraint(bar.cx, "==", 300));
-let cy_cn = solver.addConstraint(new Constraint(bar.cy, "==", 200));
+solver.addConstraint(new Constraint(left2, "==", right1));
+solver.addConstraint(new Constraint(left2, "==", 0));
 
 solver.solve();
 
-console.log(`cx_cn = ${cx_cn}`);
-console.log(`cy_cn = ${cy_cn}`);
+solver.constraints.forEach(cn => {
+    console.log(cn.isSatisfied());
+});
+
+console.log(r1.toString());
+console.log(r2.toString());
+
+
+layout1.translation[0] = r1.x.value;
+layout2.translation[0] = r2.x.value;
+
 
 
 document.body.style.backgroundColor = 'gray';
@@ -77,16 +60,24 @@ canvas.style.backgroundColor = 'white';
 document.body.appendChild(canvas);
 
 var ctx = canvas.getContext('2d');
+ctx.translate(500, 350);
 
 let draw = function (x, y) {
-    ctx.fillStyle = 'red';
-    ctx.fillRect(r1.x.value, r1.y.value, r1.w.value, r1.h.value);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.translate(500, 350);
 
-    ctx.fillStyle = 'blue';
-    ctx.fillRect(r2.x.value, r2.y.value, r2.w.value, r2.h.value);
+    ctx.strokeStyle = 'black';
 
-    ctx.fillStyle = 'black';
-    ctx.fillRect(bar.x.value, bar.y.value, bar.w.value, bar.h.value);
+    ctx.beginPath();
+    ctx.moveTo(-250,0);
+    ctx.lineTo(255,0);
+    ctx.moveTo(0,-250);
+    ctx.lineTo(0,250);
+    ctx.stroke();
+
+    layout1.draw(ctx);
+    layout2.draw(ctx);
 
     ctx.beginPath();
     ctx.arc(x, y, 3, 0, 2 * Math.PI, false);
@@ -94,7 +85,7 @@ let draw = function (x, y) {
     ctx.fill();
 };
 
-draw(300, 200);
+draw(0, 0);
 
 let down = false;
 document.addEventListener('mousedown', e => {
@@ -103,14 +94,19 @@ document.addEventListener('mousedown', e => {
 
 document.addEventListener('mousemove', e => {
     if (down) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let x = e.pageX - 500;
+        let y = e.pageY - 350;
 
-        cx_cn.update(bar.cx, "==", e.pageX);
-        cy_cn.update(bar.cy, "==", e.pageY);
+        // TODO: create a small example showing updates
+        // don't need to update these constraints
+        // infact for glyph layout1 we'll only have static constraints
+        //cx_cn.update(bar.cx, "==", x);
+        //cy_cn.update(bar.cy, "==", y);
+        //solver1.solve();
 
-        solver.solve();
+        //layout1.translation = [x, y];
 
-        draw(e.pageX, e.pageY);
+        draw(x, y);
     }
 });
 
