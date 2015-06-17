@@ -6,6 +6,7 @@ class Constraint {
         this.update(left, comp, right);
     }
 
+    // TODO: create an example with updating constraints
     update(left, comp, right) {
         if (Number.isFinite(left)) {
             left = new Expression(left);
